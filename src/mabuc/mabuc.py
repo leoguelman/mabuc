@@ -7,9 +7,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-class DGP():
+class Mabuc():
     """
     Data Generating Process 
+    
     pr_D: probability of a gambler being drunk
     pr_B: probability that machine would be blinking
     pr_payout: probability of payout
@@ -160,7 +161,7 @@ class DGP():
         for _ in range(R):
             
             data_r = {str(t):None for t in range(self.T)}
-            dgp = DGP(pr_D=self.pr_D, pr_B=self.pr_B, T=self.T)
+            dgp = Mabuc(pr_D=self.pr_D, pr_B=self.pr_B, T=self.T)
             dgp.sample_players()
             dgp.pull_arm()
             dgp.get_payout()
@@ -262,12 +263,4 @@ class DGP():
         plt.show()
         
         
-
-### Test 
-         
-m = DGP(pr_D=0.5, pr_B=0.5, T=1000)
-m.generate_samples(R=1000)
-m.get_stats()
-m.plot()
-
 
