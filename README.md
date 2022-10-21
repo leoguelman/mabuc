@@ -3,7 +3,7 @@
 Multi-arm bandits with unobserved confounders
 
 
-![This is an image](/img/figure1.png)
+![This is an image](/imgages/figure1.png)
 
 ## Todo
 
