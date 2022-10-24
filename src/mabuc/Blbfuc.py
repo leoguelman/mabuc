@@ -47,8 +47,8 @@ class Blbfuc():
         #---- Play client choice (clc), random (rct), and oracle strategies
         for t in range(self.T):
             X_clc_t = int((self.C.get(str(t))['I'] ^ self.C.get(str(t))['M']))
-            #I==0 and M==0 | I==1 and M==1 ==> X=0
-            #I==0 and M==1 | I==1 and M==0 == >X=1
+            # I==0 and M==0 | I==1 and M==1 ==> X=0
+            # I==0 and M==1 | I==1 and M==0 == >X=1
             X_rct_t = int(np.random.binomial(1, 0.5, 1))  
             X_ora_t = int(np.array([1, 0, 0, 1])[self.C.get(str(t))['M'] + 2 * self.C.get(str(t))['I']])
             # I==0 and M==0 ==> X=1
@@ -131,7 +131,67 @@ class Blbfuc():
         self.data = data 
         
         return self
+    
+    def counterfactuals(self):
+        data = self.data
+        R = len(data)
         
+        
+        for r in range(R):
+            
+            Py_dox0_m0, Py_dox0_m1, Py_dox1_m0, Py_dox1_m1 =  \
+                data[r].groupby(['X_rct', 'M'])['Y_rct'].agg('mean').values
+            
+            Py_x0_m0, Py_x0_m1, Py_x1_m0, Py_x1_m1 =  \
+                data[r].groupby(['X_clc', 'M'])['Y_clc'].agg('mean').values
+                
+            Px1_m0, Px1_m1  = \
+                data[r].groupby(['M'])['X_clc'].agg('mean').values
+            
+            Px0_m0 = 1-Px1_m0
+            Px0_m1 = 1-Px1_m1
+            
+            Pyx1_x0_m1 = \
+                (Py_dox1_m1 - Py_x1_m1 * Px1_m1) * 1/Px0_m1
+                
+            Pyx1_x0_m0 = \
+                (Py_dox1_m0 - Py_x1_m0 * Px1_m0) * 1/Px0_m0
+                  
+            Pyx0_x1_m1 = \
+                (Py_dox0_m1 - Py_x0_m1 * Px0_m1) * 1/Px1_m1
+                
+            Pyx0_x1_m0 = \
+                (Py_dox0_m0 - Py_x0_m0 * Px0_m0) * 1/Px1_m0
+                
+            
+            M = data[r]['M'].values
+            X_clc = data[r]['X_clc'].values
+            
+            if M==1 and X_clc==0:
+                if Pyx1_x0_m1 - Py_x0_m1 > 0:
+                    X_csl=1
+                else:
+                    X_csl=0
+                
+            elif M==1 and X_clc==1:
+                if Py_x1_m1 - Pyx0_x1_m1 > 0:
+                    X_csl=1
+                else:
+                    X_csl=0
+            
+            elif M==0 and X_clc==0:
+                if Pyx1_x0_m0 - Py_x0_m0 > 0:
+                    X_csl=1
+                else:
+                    X_csl=0
+            
+            elif M==0 and X_clc==1:
+                if Py_x1_m0 - Pyx0_x1_m0 > 0:
+                    X_csl=1
+                else:
+                    X_csl=0
+                
+            
                 
     def get_stats(self):
         
@@ -218,7 +278,7 @@ class Blbfuc():
 ###
 
 m = Blbfuc(pr_I=0.5, pr_M=0.5, T=1000)
-m.generate_samples(R=1000)
+m.generate_samples(R=10)
 m.get_stats()
 
         
