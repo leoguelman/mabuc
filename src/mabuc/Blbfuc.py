@@ -131,11 +131,12 @@ class Blbfuc():
         self.data = data 
         
         return self
+
     
-    def counterfactuals(self):
+    def get_counterfactuals(self):
+        
         data = self.data
         R = len(data)
-        
         
         for r in range(R):
             
@@ -164,33 +165,51 @@ class Blbfuc():
                 (Py_dox0_m0 - Py_x0_m0 * Px0_m0) * 1/Px1_m0
                 
             
-            M = data[r]['M'].values
-            X_clc = data[r]['X_clc'].values
+            def _action_map(df):
             
-            if M==1 and X_clc==0:
-                if Pyx1_x0_m1 - Py_x0_m1 > 0:
-                    X_csl=1
-                else:
-                    X_csl=0
+                M = df['M']
+                X_clc = df['X_clc']
+            
+                if M==1 and X_clc==0:
+                    if Pyx1_x0_m1 - Py_x0_m1 > 0: # same for all obs within data[r]
+                        X_csl = 1
+                    else:
+                        X_csl = 0
+                    
+                elif M==1 and X_clc==1:
+                    if Py_x1_m1 - Pyx0_x1_m1 > 0:
+                        X_csl = 1
+                    else:
+                        X_csl = 0
                 
-            elif M==1 and X_clc==1:
-                if Py_x1_m1 - Pyx0_x1_m1 > 0:
-                    X_csl=1
-                else:
-                    X_csl=0
-            
-            elif M==0 and X_clc==0:
-                if Pyx1_x0_m0 - Py_x0_m0 > 0:
-                    X_csl=1
-                else:
-                    X_csl=0
-            
-            elif M==0 and X_clc==1:
-                if Py_x1_m0 - Pyx0_x1_m0 > 0:
-                    X_csl=1
-                else:
-                    X_csl=0
+                elif M==0 and X_clc==0:
+                    if Pyx1_x0_m0 - Py_x0_m0 > 0:
+                        X_csl = 1
+                    else:
+                        X_csl = 0
                 
+                elif M==0 and X_clc==1:
+                    if Py_x1_m0 - Pyx0_x1_m0 > 0:
+                        X_csl = 1
+                    else:
+                        X_csl = 0
+                        
+                return  X_csl 
+                    
+           
+            data[r]['X_csl'] = data[r].apply(_action_map, axis=1)   
+            
+            Y_csl = []
+            for t in range(self.T):
+                Y_csl.append(self.get_payout_t(X=data[r]['X_csl'].iloc[t], 
+                                  I = data[r]['I'].iloc[t],
+                                  M = data[r]['M'].iloc[t]))
+                
+            data[r]['Y_csl'] = Y_csl
+          
+        self.data = data
+            
+        return self
             
                 
     def get_stats(self):
@@ -201,11 +220,14 @@ class Blbfuc():
         clc_summary = np.zeros(shape=[R, 4])
         rct_summary = np.zeros(shape=[R, 4])
         ora_summary = np.zeros(shape=[R, 4])
+        csl_summary = np.zeros(shape=[R, 4])
+      
         
         for r in range(R):
             clc_summary[r] = data[r].groupby(['X_clc', 'M'])['Y_clc'].agg('mean').values
             rct_summary[r] = data[r].groupby(['X_rct', 'M'])['Y_rct'].agg('mean').values
             ora_summary[r] = data[r].groupby(['X_ora', 'M'])['Y_ora'].agg('mean').values
+            #csl_summary[r] = data[r].groupby(['X_csl', 'M'])['Y_csl'].agg('mean').values
             
         
         with np.printoptions(precision=3, suppress=True):
@@ -222,12 +244,17 @@ class Blbfuc():
             print("Mean:", np.mean(rct_summary, axis=0))
             print("S.E.:", np.std(rct_summary, ddof=1, axis=0) / np.sqrt(R))
             
+            #print("\n RCT Payout [P-F, P-M, D-F, D-M]: \n")
+            #print("Mean:", np.mean(csl_summary, axis=0))
+            #print("S.E.:", np.std(csl_summary, ddof=1, axis=0) / np.sqrt(R))
+            
         
         ymean_ora = np.zeros(shape=[R])
         ymean_clc = np.zeros(shape=[R])
         ymean_rct = np.zeros(shape=[R])
         ymean_clc_opt = np.zeros(shape=[R])
         ymean_rct_opt = np.zeros(shape=[R])
+        ymean_csl_opt = np.zeros(shape=[R])
         
         for r in range(R):
             ymean_ora[r] = data[r]['Y_ora'].agg('mean')
@@ -235,6 +262,7 @@ class Blbfuc():
             ymean_rct[r] = data[r]['Y_rct'].agg('mean')
             ymean_clc_opt[r] = data[r]['Y_clc_opt'].agg('mean')
             ymean_rct_opt[r] = data[r]['Y_rct_opt'].agg('mean')
+            ymean_csl_opt[r] = data[r]['Y_csl'].agg('mean')
         
         
         with np.printoptions(precision=3, suppress=True):
@@ -259,6 +287,10 @@ class Blbfuc():
             print("Mean:", np.mean(ymean_rct_opt))
             print("S.E.:", np.std(ymean_rct_opt, ddof=1) / np.sqrt(R))
        
+            print("\n CSL Optimal Payout \n")
+            print("Mean:", np.mean(ymean_csl_opt))
+            print("S.E.:", np.std(ymean_csl_opt, ddof=1) / np.sqrt(R))
+   
         
         self.clc_summary = clc_summary
         self.rct_summary = rct_summary
@@ -278,7 +310,8 @@ class Blbfuc():
 ###
 
 m = Blbfuc(pr_I=0.5, pr_M=0.5, T=1000)
-m.generate_samples(R=10)
+m.generate_samples(R=100)
+m.get_counterfactuals()
 m.get_stats()
 
         
