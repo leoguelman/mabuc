@@ -105,37 +105,8 @@ class Blbfuc():
         
         return self
     
-    def generate_samples(self, R:int=100):
-        
-        """
-        R: Number of repetitions of simulation
-        """
-        
-        data = []
-        
-        for _ in range(R):
-            
-            data_r = {str(t):None for t in range(self.T)}
-            dgp = Blbfuc(pr_I=self.pr_I, pr_M=self.pr_M, T=self.T)
-            dgp.sample_clients()
-            dgp.play_policy()
-            dgp.get_payout()
-        
-            for t in range(self.T):
-                data_r[str(t)] = {**dgp.Y[str(t)],**dgp.X[str(t)], **dgp.C[str(t)]}
-         
-            df_r = pd.DataFrame.from_dict(data_r, orient='index')
-       
-            data.append(df_r)
-        
-        self.data = data 
-        
-        return self
-
+    def _regret_decision_criterion(self, data):
     
-    def get_counterfactuals(self):
-        
-        data = self.data
         R = len(data)
         
         for r in range(R):
@@ -164,54 +135,88 @@ class Blbfuc():
             Pyx0_x1_m0 = \
                 (Py_dox0_m0 - Py_x0_m0 * Px0_m0) * 1/Px1_m0
                 
+            M1_X_clc0 = Pyx1_x0_m1 - Py_x0_m1 > 0
+            M1_X_clc1 = Py_x1_m1 - Pyx0_x1_m1 > 0
+            M0_X_clc0 = Pyx1_x0_m0 - Py_x0_m0 > 0
+            M0_X_clc1 = Py_x1_m0 - Pyx0_x1_m0 > 0
             
-            def _action_map(df):
+            
+            def _action_map(df, M1_X_clc0, M1_X_clc1, M0_X_clc0, M0_X_clc1):
             
                 M = df['M']
                 X_clc = df['X_clc']
             
                 if M==1 and X_clc==0:
-                    if Pyx1_x0_m1 - Py_x0_m1 > 0: # same for all obs within data[r]
-                        X_csl = 1
+                    if M1_X_clc0: 
+                        X_rdc = 1
                     else:
-                        X_csl = 0
+                        X_rdc = 0
                     
                 elif M==1 and X_clc==1:
-                    if Py_x1_m1 - Pyx0_x1_m1 > 0:
-                        X_csl = 1
+                    if M1_X_clc1:
+                        X_rdc = 1
                     else:
-                        X_csl = 0
+                        X_rdc = 0
                 
                 elif M==0 and X_clc==0:
-                    if Pyx1_x0_m0 - Py_x0_m0 > 0:
-                        X_csl = 1
+                    if M0_X_clc0:
+                        X_rdc = 1
                     else:
-                        X_csl = 0
+                        X_rdc = 0
                 
                 elif M==0 and X_clc==1:
-                    if Py_x1_m0 - Pyx0_x1_m0 > 0:
-                        X_csl = 1
+                    if M0_X_clc1:
+                        X_rdc = 1
                     else:
-                        X_csl = 0
+                        X_rdc = 0
                         
-                return  X_csl 
+                return  X_rdc 
                     
            
-            data[r]['X_csl'] = data[r].apply(_action_map, axis=1)   
+            data[r]['X_rdc'] = data[r].apply(_action_map, 
+                                             args=(M1_X_clc0, M1_X_clc1, M0_X_clc0, M0_X_clc1), axis=1)   
             
-            Y_csl = []
+            Y_rdc = []
             for t in range(self.T):
-                Y_csl.append(self.get_payout_t(X=data[r]['X_csl'].iloc[t], 
+                Y_rdc.append(self.get_payout_t(X=data[r]['X_rdc'].iloc[t], 
                                   I = data[r]['I'].iloc[t],
                                   M = data[r]['M'].iloc[t]))
                 
-            data[r]['Y_csl'] = Y_csl
-          
-        self.data = data
+            data[r]['Y_rdc'] = Y_rdc
             
+        return data
+            
+    
+    def generate_samples(self, R:int=100):
+        
+        """
+        R: Number of repetitions of simulation
+        """
+        
+        data = []
+        
+        for _ in range(R):
+            
+            data_r = {str(t):None for t in range(self.T)}
+            dgp = Blbfuc(pr_I=self.pr_I, pr_M=self.pr_M, T=self.T)
+            dgp.sample_clients()
+            dgp.play_policy()
+            dgp.get_payout()
+        
+            for t in range(self.T):
+                data_r[str(t)] = {**dgp.Y[str(t)],**dgp.X[str(t)], **dgp.C[str(t)]}
+         
+            df_r = pd.DataFrame.from_dict(data_r, orient='index')
+       
+            data.append(df_r)
+        
+        data = self._regret_decision_criterion(data)
+        
+        self.data = data 
+        
         return self
-            
-                
+
+    
     def get_stats(self):
         
         data = self.data
@@ -220,14 +225,14 @@ class Blbfuc():
         clc_summary = np.zeros(shape=[R, 4])
         rct_summary = np.zeros(shape=[R, 4])
         ora_summary = np.zeros(shape=[R, 4])
-        csl_summary = np.zeros(shape=[R, 4])
+        #rdc_summary = np.zeros(shape=[R, 4])
       
         
         for r in range(R):
             clc_summary[r] = data[r].groupby(['X_clc', 'M'])['Y_clc'].agg('mean').values
             rct_summary[r] = data[r].groupby(['X_rct', 'M'])['Y_rct'].agg('mean').values
             ora_summary[r] = data[r].groupby(['X_ora', 'M'])['Y_ora'].agg('mean').values
-            #csl_summary[r] = data[r].groupby(['X_csl', 'M'])['Y_csl'].agg('mean').values
+            #rdc_summary[r] = data[r].groupby(['X_rdc', 'M'])['Y_rdc'].agg('mean').values
             
         
         with np.printoptions(precision=3, suppress=True):
@@ -254,7 +259,7 @@ class Blbfuc():
         ymean_rct = np.zeros(shape=[R])
         ymean_clc_opt = np.zeros(shape=[R])
         ymean_rct_opt = np.zeros(shape=[R])
-        ymean_csl_opt = np.zeros(shape=[R])
+        ymean_rdc_opt = np.zeros(shape=[R])
         
         for r in range(R):
             ymean_ora[r] = data[r]['Y_ora'].agg('mean')
@@ -262,7 +267,7 @@ class Blbfuc():
             ymean_rct[r] = data[r]['Y_rct'].agg('mean')
             ymean_clc_opt[r] = data[r]['Y_clc_opt'].agg('mean')
             ymean_rct_opt[r] = data[r]['Y_rct_opt'].agg('mean')
-            ymean_csl_opt[r] = data[r]['Y_csl'].agg('mean')
+            ymean_rdc_opt[r] = data[r]['Y_rdc'].agg('mean')
         
         
         with np.printoptions(precision=3, suppress=True):
@@ -287,9 +292,9 @@ class Blbfuc():
             print("Mean:", np.mean(ymean_rct_opt))
             print("S.E.:", np.std(ymean_rct_opt, ddof=1) / np.sqrt(R))
        
-            print("\n CSL Optimal Payout \n")
-            print("Mean:", np.mean(ymean_csl_opt))
-            print("S.E.:", np.std(ymean_csl_opt, ddof=1) / np.sqrt(R))
+            print("\n RDC Optimal Payout \n")
+            print("Mean:", np.mean(ymean_rdc_opt))
+            print("S.E.:", np.std(ymean_rdc_opt, ddof=1) / np.sqrt(R))
    
         
         self.clc_summary = clc_summary
@@ -298,8 +303,8 @@ class Blbfuc():
         self.ymean_ora = ymean_ora
         self.ymean_clc = ymean_clc
         self.ymean_rct = ymean_rct
-        self.ymean_clc_opt = ymean_clc_opt
-        self.ymean_rct_opt = ymean_rct_opt
+        self.ymean_rdc_opt = ymean_rdc_opt
+        self.ymean_rdc_opt = ymean_rdc_opt
         
         return self
         
@@ -311,7 +316,6 @@ class Blbfuc():
 
 m = Blbfuc(pr_I=0.5, pr_M=0.5, T=1000)
 m.generate_samples(R=100)
-m.get_counterfactuals()
 m.get_stats()
 
         
