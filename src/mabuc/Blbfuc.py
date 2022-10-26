@@ -98,7 +98,6 @@ class Blbfuc():
                          'Y_ora': self.get_payout_t(self.X.get(str(t))['X_ora'], self.C.get(str(t))['I'], self.C.get(str(t))['M']),
                          'Y_clc_opt': self.get_payout_t(self.X.get(str(t))['X_clc_opt'], self.C.get(str(t))['I'], self.C.get(str(t))['M']),
                          'Y_rct_opt': self.get_payout_t(self.X.get(str(t))['X_rct_opt'], self.C.get(str(t))['I'], self.C.get(str(t))['M']),
-                        
                          }
          
         self.Y = Y
