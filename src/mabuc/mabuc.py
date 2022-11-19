@@ -63,7 +63,8 @@ class Mabuc():
             #---- Play intuition, random, and optimal strategies
             X_int_t = int((self.C.get(str(t))['D'] ^ self.C.get(str(t))['B']))
             X_rnd_t = int(np.random.binomial(1, 0.5, 1))  
-            X_opt_t = int(np.array([1, 0, 0, 1])[self.C.get(str(t))['B'] + 2 * self.C.get(str(t))['D']])
+            #X_opt_t = int(np.array([1, 0, 0, 1])[self.C.get(str(t))['B'] + 2 * self.C.get(str(t))['D']])      
+            X_opt_t = int(np.argmax(self.pr_payout, axis=0)[self.C.get(str(t))['B'] + 2 * self.C.get(str(t))['D']])
             
             #---- Play Thompson Sampling 
             theta0 = float(np.random.beta(a0, b0, size =1))
@@ -161,7 +162,7 @@ class Mabuc():
         for _ in range(R):
             
             data_r = {str(t):None for t in range(self.T)}
-            dgp = Mabuc(pr_D=self.pr_D, pr_B=self.pr_B, T=self.T)
+            dgp = Mabuc(pr_D=self.pr_D, pr_B=self.pr_B, T=self.T, pr_payout=self.pr_payout)
             dgp.sample_players()
             dgp.pull_arm()
             dgp.get_payout()
@@ -263,4 +264,3 @@ class Mabuc():
         plt.show()
         
         
-
